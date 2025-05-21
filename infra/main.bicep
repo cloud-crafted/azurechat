@@ -103,13 +103,13 @@ resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
 
 // Add parameters to control which services to deploy
 @description('Specifies whether to deploy DALL-E resources')
-param enableDALLE bool = true
+param enableDALLE bool = false
 
 @description('Specifies whether to enable Vision capabilities')
-param enableVision bool = true
+param enableVision bool = false
 
 @description('Specifies whether this is an Azure Government deployment')
-param isAzureGov bool = false
+param isAzureGov bool = true
 
 @description('Specifies the SKU name for App Service Plan')
 @allowed([

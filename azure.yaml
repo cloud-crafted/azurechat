@@ -8,19 +8,10 @@ services:
     project: ./src
     language: ts
     host: appservice
-parameters:
-  isAzureGov:
-    type: boolean
-    default: false
-    description: Set to true when deploying to Azure Government cloud
-  enableDALLE:
-    type: boolean
-    default: false
-    description: Set to false when deploying to Azure Government cloud as DALL-E is not available
-  enableVision:
-    type: boolean
-    default: false
-    description: Set to false when deploying to Azure Government cloud as Vision is not available
+    parameters:
+      isAzureGov: true
+      enableDALLE: false
+      enableVision: false
 hooks:
   postdeploy:
     posix:
