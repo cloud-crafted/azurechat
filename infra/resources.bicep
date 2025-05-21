@@ -134,7 +134,16 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2020-06-01' = {
   kind: 'linux'
 }
 
-var appSettingsCommon = [
+var appSettingsGovCloud = isAzureGov
+  ? [
+      {
+        name: 'AZURE_GOV'
+        value: string(isAzureGov)
+      }
+    ]
+  : []
+
+var appSettingsCommon = concat([
   {
     name: 'USE_MANAGED_IDENTITIES'
     value: disableLocalAuth
@@ -212,7 +221,19 @@ var appSettingsCommon = [
     name: 'AZURE_STORAGE_ACCOUNT_NAME'
     value: storage_name
   }
-]
+  {
+    name: 'ENABLE_DALLE'
+    value: string(enableDALLE)
+  }
+  {
+    name: 'ENABLE_VISION'
+    value: string(enableVision)
+  }
+  {
+    name: 'AZURE_GOV'
+    value: string(isAzureGov)
+  }
+], appSettingsGovCloud)
 
 var appSettingsWithLocalAuth = disableLocalAuth
   ? []
@@ -726,3 +747,72 @@ output search_name string = search_name
 output form_recognizer_name string = form_recognizer_name
 output storage_name string = storage_name
 output key_vault_name string = keyVaultName
+
+// Add parameters for feature flags
+param enableDALLE bool
+param enableVision bool
+param isAzureGov bool
+
+// Conditionally deploy DALL-E resource if enabled
+resource openai_dalle 'Microsoft.CognitiveServices/accounts@2023-05-01' = if (enableDALLE) {
+  name: openai_dalle_name
+  location: dalleLocation
+  kind: 'OpenAI'
+  sku: {
+    name: openaiSku
+  }
+  properties: {
+    customSubDomainName: openai_dalle_name
+    publicNetworkAccess: usePrivateNetworking ? 'Disabled' : 'Enabled'
+  }
+}
+
+// Conditionally deploy DALL-E model deployment if enabled
+resource dalle_deployment 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = if (enableDALLE) {
+  parent: openai_dalle
+  name: dalleDeploymentName
+  properties: {
+    model: {
+      format: 'OpenAI'
+      name: dalleModelName
+    }
+    scaleSettings: {
+      scaleType: 'Standard'
+      capacity: dalleDeploymentCapacity
+    }
+  }
+}
+
+// Only add DALLE secrets to Key Vault if DALL-E is enabled
+resource dalle_api_key 'Microsoft.KeyVault/vaults/secrets@2022-07-01' = if (enableDALLE) {
+  parent: keyVault
+  name: 'AZURE-OPENAI-DALLE-API-KEY'
+  properties: {
+    value: enableDALLE ? listKeys(openai_dalle.id, '2023-05-01').key1 : 'disabled'
+  }
+}
+
+// Conditionally set DALL-E environment variables for the web app
+resource webSiteDALLEConfig 'Microsoft.Web/sites/config@2022-03-01' = if (enableDALLE) {
+  parent: webApp
+  name: 'appsettings'
+  properties: {
+    AZURE_OPENAI_DALLE_API_KEY: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=AZURE-OPENAI-DALLE-API-KEY)'
+    AZURE_OPENAI_DALLE_API_INSTANCE_NAME: openai_dalle_name
+    AZURE_OPENAI_DALLE_API_DEPLOYMENT_NAME: dalleDeploymentName
+    AZURE_OPENAI_DALLE_API_VERSION: dalleApiVersion
+    ENABLE_DALLE: string(enableDALLE)
+    ENABLE_VISION: string(enableVision)
+  }
+}
+
+// Update all web app settings to include feature flags
+resource webSiteConfig 'Microsoft.Web/sites/config@2022-03-01' = {
+  parent: webApp
+  name: 'appsettings'
+  properties: {
+    // ... existing properties ...
+    ENABLE_DALLE: string(enableDALLE)
+    ENABLE_VISION: string(enableVision)
+  }
+}

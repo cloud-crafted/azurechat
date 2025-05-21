@@ -1,28 +1,36 @@
-import { BlobServiceClient, RestError } from "@azure/storage-blob";
+import { BlobServiceClient, RestError, StorageSharedKeyCredential } from "@azure/storage-blob";
 import { ServerActionResponse } from "../server-action-response";
 import { DefaultAzureCredential } from "@azure/identity";
 
 // initialize the blobServiceClient
 const USE_MANAGED_IDENTITIES = process.env.USE_MANAGED_IDENTITIES === "true";
+const IS_AZURE_GOV = process.env.AZURE_GOV === "true";
+const accountName = process.env.AZURE_STORAGE_ACCOUNT_NAME;
+const endpointSuffix = process.env.AZURE_STORAGE_ENDPOINT_SUFFIX || 
+  (IS_AZURE_GOV ? "core.usgovcloudapi.net" : "core.windows.net");
 
-const InitBlobServiceClient = () => {
-  const accountName = process.env.AZURE_STORAGE_ACCOUNT_NAME;
-  const endpointSuffix = process.env.AZURE_STORAGE_ENDPOINT_SUFFIX || "core.windows.net";
-  const endpoint = `https://${accountName}.blob.${endpointSuffix}`;
+export const AzureStorageBlobServiceInstance = (): BlobServiceClient => {
+  let blobServiceClient: BlobServiceClient;
 
   if (USE_MANAGED_IDENTITIES) {
-    return new BlobServiceClient(endpoint, new DefaultAzureCredential());
-  }
-
-  const accountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY;
-  if (!accountName || !accountKey) {
-    throw new Error(
-      "Azure Storage Account not configured correctly, check environment variables."
+    const credential = new DefaultAzureCredential();
+    blobServiceClient = new BlobServiceClient(
+      `https://${accountName}.${endpointSuffix}`,
+      credential
+    );
+  } else {
+    const accountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY;
+    const sharedKeyCredential = new StorageSharedKeyCredential(
+      accountName!,
+      accountKey!
+    );
+    blobServiceClient = new BlobServiceClient(
+      `https://${accountName}.${endpointSuffix}`,
+      sharedKeyCredential
     );
   }
 
-  const connectionString = `DefaultEndpointsProtocol=https;AccountName=${accountName};AccountKey=${accountKey};EndpointSuffix=${endpointSuffix}`;
-  return BlobServiceClient.fromConnectionString(connectionString);
+  return blobServiceClient;
 };
 
 export const UploadBlob = async (
@@ -30,7 +38,7 @@ export const UploadBlob = async (
   blobName: string,
   blobData: Buffer
 ): Promise<ServerActionResponse<string>> => {
-  const blobServiceClient = InitBlobServiceClient();
+  const blobServiceClient = AzureStorageBlobServiceInstance();
 
   const containerClient = blobServiceClient.getContainerClient(containerName);
   const blockBlobClient = containerClient.getBlockBlobClient(blobName);
@@ -58,7 +66,7 @@ export const GetBlob = async (
   containerName: string,
   blobPath: string
 ): Promise<ServerActionResponse<ReadableStream<any>>> => {
-  const blobServiceClient = InitBlobServiceClient();
+  const blobServiceClient = AzureStorageBlobServiceInstance();
 
   const containerClient = blobServiceClient.getContainerClient(containerName);
   const blockBlobClient = containerClient.getBlockBlobClient(blobPath);

@@ -101,39 +101,61 @@ resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
   tags: tags
 }
 
-module resources 'resources.bicep' = {
-  name: 'all-resources'
-  scope: rg
+// Add parameters to control which services to deploy
+@description('Specifies whether to deploy DALL-E resources')
+param enableDALLE bool = true
+
+@description('Specifies whether to enable Vision capabilities')
+param enableVision bool = true
+
+@description('Specifies whether this is an Azure Government deployment')
+param isAzureGov bool = false
+
+@description('Specifies the SKU name for App Service Plan')
+@allowed([
+  'B1'
+  'B2'
+  'B3'
+  'S1'
+  'S2'
+  'S3'
+  'P1V2'
+  'P2V2'
+  'P3V2'
+])
+param webAppServicePlanSku string = 'B1'
+
+module resources './resources.bicep' = {
+  name: '${deployment().name}-resources'
   params: {
-    name: name
+    location: location
     resourceToken: resourceToken
+    name: name
     tags: tags
-    openai_api_version: openAIApiVersion
-    openAiLocation: openAILocation
-    openAiSkuName: openAISku
-    chatGptDeploymentCapacity: chatGptDeploymentCapacity
-    chatGptDeploymentName: chatGptDeploymentName
-    chatGptModelName: chatGptModelName
-    chatGptModelVersion: chatGptModelVersion
-    embeddingDeploymentName: embeddingDeploymentName
-    embeddingDeploymentCapacity: embeddingDeploymentCapacity
-    embeddingModelName: embeddingModelName
+    openaiLocation: openAILocation
+    openaiSku: openAISku
+    openaiModelName: chatGptModelName
+    openaiModelDeploymentName: chatGptDeploymentName
+    openaiApiVersion: openAIApiVersion
+    openaiCapacity: chatGptDeploymentCapacity
+    openaiEmbeddingModelDeploymentName: embeddingDeploymentName
+    openaiEmbeddingModelName: embeddingModelName
     dalleLocation: dalleLocation
     dalleDeploymentCapacity: dalleDeploymentCapacity
     dalleDeploymentName: dalleDeploymentName
     dalleModelName: dalleModelName
     dalleApiVersion: dalleApiVersion
-    formRecognizerSkuName: formRecognizerSkuName
-    searchServiceIndexName: searchServiceIndexName
+    enableDALLE: enableDALLE
+    enableVision: enableVision
+    isAzureGov: isAzureGov
+    webAppServicePlanSku: webAppServicePlanSku
+    searchApiVersion: openAIApiVersion
+    searchServiceResourceToken: resourceToken
     searchServiceSkuName: searchServiceSkuName
-    storageServiceSku: storageServiceSku
-    storageServiceImageContainerName: storageServiceImageContainerName
-    location: location
-    disableLocalAuth: disableLocalAuth
-    usePrivateEndpoints: usePrivateEndpoints
-    privateEndpointVNetPrefix: privateEndpointVNetPrefix
-    privateEndpointSubnetAddressPrefix: privateEndpointSubnetAddressPrefix
-    appServiceBackendSubnetAddressPrefix: appServiceBackendSubnetAddressPrefix
+    storageServiceResourceToken: resourceToken
+    usePrivateNetworking: usePrivateEndpoints
+    appServicePlanResourceToken: resourceToken
+    cosmosdbResourceToken: resourceToken
   }
 }
 

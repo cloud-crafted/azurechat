@@ -20,6 +20,8 @@ import { ChatApiMultimodal } from "./chat-api-multimodal";
 import { OpenAIStream } from "./open-ai-stream";
 type ChatTypes = "extensions" | "chat-with-file" | "multimodal";
 
+const ENABLE_VISION = process.env.ENABLE_VISION === "true";
+
 export const ChatAPIEntry = async (props: UserPrompt, signal: AbortSignal) => {
   const currentChatThreadResponse = await EnsureChatThreadOperation(props.id);
 
@@ -46,7 +48,8 @@ export const ChatAPIEntry = async (props: UserPrompt, signal: AbortSignal) => {
 
   let chatType: ChatTypes = "extensions";
 
-  if (props.multimodalImage && props.multimodalImage.length > 0) {
+  // Only use multimodal if Vision is enabled
+  if (props.multimodalImage && props.multimodalImage.length > 0 && ENABLE_VISION) {
     chatType = "multimodal";
   } else if (docs.length > 0) {
     chatType = "chat-with-file";

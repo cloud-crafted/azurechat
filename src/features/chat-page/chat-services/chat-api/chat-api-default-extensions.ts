@@ -7,6 +7,8 @@ import { uniqueId } from "@/features/common/util";
 import { GetImageUrl, UploadImageToStore } from "../chat-image-service";
 import { ChatThreadModel } from "../models";
 
+const ENABLE_DALLE = process.env.ENABLE_DALLE === "true";
+
 export const GetDefaultExtensions = async (props: {
   chatThread: ChatThreadModel;
   userMessage: string;
@@ -14,29 +16,31 @@ export const GetDefaultExtensions = async (props: {
 }): Promise<ServerActionResponse<Array<any>>> => {
   const defaultExtensions: Array<any> = [];
 
-  // Add image creation Extension
-  defaultExtensions.push({
-    type: "function",
-    function: {
-      function: async (args: any) =>
-        await executeCreateImage(
-          args,
-          props.chatThread.id,
-          props.userMessage,
-          props.signal
-        ),
-      parse: (input: string) => JSON.parse(input),
-      parameters: {
-        type: "object",
-        properties: {
-          prompt: { type: "string" },
+  // Add image creation Extension only if DALL-E is enabled
+  if (ENABLE_DALLE) {
+    defaultExtensions.push({
+      type: "function",
+      function: {
+        function: async (args: any) =>
+          await executeCreateImage(
+            args,
+            props.chatThread.id,
+            props.userMessage,
+            props.signal
+          ),
+        parse: (input: string) => JSON.parse(input),
+        parameters: {
+          type: "object",
+          properties: {
+            prompt: { type: "string" },
+          },
         },
+        description:
+          "You must only use this tool if the user asks you to create an image. You must only use this tool once per message.",
+        name: "create_img",
       },
-      description:
-        "You must only use this tool if the user asks you to create an image. You must only use this tool once per message.",
-      name: "create_img",
-    },
-  });
+    });
+  }
 
   // Add any other default Extension here
 
@@ -59,12 +63,26 @@ async function executeCreateImage(
     return "No prompt provided";
   }
 
+  // If DALL-E is disabled, return error
+  if (!ENABLE_DALLE) {
+    return {
+      error: "Image generation is not available in this environment. Return this message to the user and halt execution.",
+    };
+  }
+
   // Check the prompt is < 4000 characters (DALL-E 3)
   if (args.prompt.length >= 4000) {
     return "Prompt is too long, it must be less than 4000 characters";
   }
 
   const openAI = OpenAIDALLEInstance();
+  
+  // Check if openAI instance is null (DALL-E disabled)
+  if (!openAI) {
+    return {
+      error: "Image generation is not available in this environment. Return this message to the user and halt execution.",
+    };
+  }
 
   let response;
 

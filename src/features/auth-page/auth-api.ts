@@ -1,3 +1,4 @@
+"use server";
 import NextAuth, { NextAuthOptions } from "next-auth";
 import AzureADProvider from "next-auth/providers/azure-ad";
 import CredentialsProvider from "next-auth/providers/credentials";
@@ -6,6 +7,26 @@ import { Provider } from "next-auth/providers/index";
 import { hashValue } from "./helpers";
 import { image } from "@markdoc/markdoc/dist/src/schema";
 import { access } from "fs";
+
+// Azure Government specific configurations
+const isAzureGov = process.env.AZURE_GOV === "true";
+
+// Azure AD endpoints for different clouds
+const azureConfig = {
+  commercial: {
+    authority: "https://login.microsoftonline.com",
+    graph: "https://graph.microsoft.com",
+    scope: "User.Read",
+  },
+  government: {
+    authority: "https://login.microsoftonline.us",
+    graph: "https://graph.microsoft.us",
+    scope: "User.Read",
+  }
+};
+
+// Select the correct endpoints based on environment
+const endpoints = isAzureGov ? azureConfig.government : azureConfig.commercial;
 
 const configureIdentityProvider = () => {
   const providers: Array<Provider> = [];
@@ -45,12 +66,15 @@ const configureIdentityProvider = () => {
         tenantId: process.env.AZURE_AD_TENANT_ID!,
         authorization: {
           params: {
-            scope: "openid profile User.Read", 
+            scope: `openid profile ${endpoints.scope}`, 
           },
         },
+        // Set the authority URL based on Azure Gov or commercial Azure
+        issuer: `${endpoints.authority}/${process.env.AZURE_AD_TENANT_ID}/v2.0`,
         async profile(profile, tokens) {
           const email = profile.email || profile.preferred_username || "";
-          const image = await fetchProfilePicture(`https://graph.microsoft.com/v1.0/me/photos/48x48/$value`, tokens.access_token);
+          const photoUrl = `${endpoints.graph}/v1.0/me/photos/48x48/$value`;
+          const image = await fetchProfilePicture(photoUrl, tokens.access_token);
           const newProfile = {
             ...profile,
             email,

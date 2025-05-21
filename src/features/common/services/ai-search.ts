@@ -7,7 +7,9 @@ import {
 import { DefaultAzureCredential } from "@azure/identity";
 
 const USE_MANAGED_IDENTITIES = process.env.USE_MANAGED_IDENTITIES === "true";
-const endpointSuffix = process.env.AZURE_SEARCH_ENDPOINT_SUFFIX || "search.windows.net";
+const IS_AZURE_GOV = process.env.AZURE_GOV === "true";
+const endpointSuffix = process.env.AZURE_SEARCH_ENDPOINT_SUFFIX || 
+  (IS_AZURE_GOV ? "search.azure.us" : "search.windows.net");
 const apiKey = process.env.AZURE_SEARCH_API_KEY;
 const searchName = process.env.AZURE_SEARCH_NAME;
 const indexName = process.env.AZURE_SEARCH_INDEX_NAME;
